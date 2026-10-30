@@ -140,10 +140,13 @@
             <input
               type="text"
               id="task-title-input"
-              placeholder="Add a new task... (Press Enter to save)"
+              placeholder="Add a task or group (e.g. Homework)... Press Enter"
               autocomplete="off"
               required
             />
+            <select id="task-parent-select" class="parent-group-select" title="Place inside a Task Group (optional)">
+              <option value="">Top-Level Task / Group</option>
+            </select>
             <input
               type="date"
               id="task-due-input"
@@ -197,6 +200,12 @@
         <label class="field-label">
           <span>Task Title</span>
           <input type="text" id="edit-task-title" required />
+        </label>
+        <label class="field-label">
+          <span>Task Group (Parent Task)</span>
+          <select id="edit-task-parent">
+            <option value="">None (Top-Level Task / Group)</option>
+          </select>
         </label>
         <label class="field-label">
           <span>Due Date</span>

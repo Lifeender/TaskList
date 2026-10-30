@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TaskList — New Tab & Gemini Sync",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsqpAZbNxoROMAg5/PCSeOryrOfAVtazj6xqqZfMWpw1piepWMtG1tZDPrJKWNv06GgHCLnZil/dhVEckIrf14gWqXKwH+0o+uaUdYdgRDE6dCQr2ck7aYpYSdiVs8oxDQ9jcSuRRWAqXqk1EjOapk1YD8TfCMju5sxATICPmz5F9ZRYrnTBzWKKpG1BiugQKDJbAoJrSlIwg6zRyGUXnXgtp5wsz3YJCERD/CA5TbYl2Zr53Y0wJsaqTEUleG3mROJJocx3D1FiJYF9QvRKx0EHWsZVvYDplOEnhf/x6SmSlE0HpzRVZ9FfYtU1tfyIn5kM+WRQDPjhKv7/4KkWPTQIDAQAB",
   "description": "A clean New Tab task manager synced across PC & Mac via Chrome Sync and Google Tasks (editable via Google Gemini).",
   "permissions": [

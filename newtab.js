@@ -9,7 +9,9 @@ const state = {
   customClientId: "",
   lists: [], // [{ id, title }]
   activeListId: "default-tasklist",
-  tasksByList: {}, // { [listId]: [{ id, title, notes, due, status, updated }] }
+  tasksByList: {}, // { [listId]: [{ id, title, notes, due, status, parent, position, updated }] }
+  collapsedGroups: {}, // { [taskId]: true }
+  inlineSubtaskParentId: null,
   filter: "all" // "all" | "active" | "completed"
 };
 
@@ -34,6 +36,7 @@ const els = {
   clearCompletedBtn: document.getElementById("clear-completed-btn"),
   addTaskForm: document.getElementById("add-task-form"),
   taskTitleInput: document.getElementById("task-title-input"),
+  taskParentSelect: document.getElementById("task-parent-select"),
   taskDueInput: document.getElementById("task-due-input"),
   toggleNotesBtn: document.getElementById("toggle-notes-btn"),
   composerNotesWrap: document.getElementById("composer-notes-wrap"),
@@ -48,6 +51,7 @@ const els = {
   editTaskForm: document.getElementById("edit-task-form"),
   editTaskId: document.getElementById("edit-task-id"),
   editTaskTitle: document.getElementById("edit-task-title"),
+  editTaskParent: document.getElementById("edit-task-parent"),
   editTaskDue: document.getElementById("edit-task-due"),
   editTaskNotes: document.getElementById("edit-task-notes"),
   deleteTaskModalBtn: document.getElementById("delete-task-modal-btn"),
@@ -449,6 +453,8 @@ async function fetchTasksForList(listId) {
       notes: t.notes || "",
       due: t.due ? t.due.substring(0, 10) : "",
       status: t.status || "needsAction",
+      parent: t.parent || "",
+      position: t.position || "",
       updated: t.updated || new Date().toISOString()
     }));
 
@@ -523,7 +529,7 @@ async function deleteTaskList(listId) {
   renderAll();
 }
 
-async function addTask(title, due, notes) {
+async function addTask(title, due, notes, parentId = "") {
   const listId = state.activeListId;
   const cleanTitle = title.trim();
   if (!cleanTitle) return;
@@ -535,6 +541,7 @@ async function addTask(title, due, notes) {
     notes: (notes || "").trim(),
     due: due || "",
     status: "needsAction",
+    parent: parentId || "",
     updated: new Date().toISOString()
   };
 
@@ -542,6 +549,9 @@ async function addTask(title, due, notes) {
     state.tasksByList[listId] = [];
   }
   state.tasksByList[listId].unshift(newTask);
+  if (parentId) {
+    delete state.collapsedGroups[parentId];
+  }
   renderTasks();
 
   if (state.mode === "google" && state.authToken) {
@@ -552,14 +562,18 @@ async function addTask(title, due, notes) {
         notes: newTask.notes || undefined,
         due: newTask.due ? `${newTask.due}T00:00:00.000Z` : undefined
       };
+      const parentQuery = parentId
+        ? `?parent=${encodeURIComponent(parentId)}`
+        : "";
       const created = await googleApiFetch(
-        `/lists/${encodeURIComponent(listId)}/tasks`,
+        `/lists/${encodeURIComponent(listId)}/tasks${parentQuery}`,
         {
           method: "POST",
           body: JSON.stringify(payload)
         }
       );
       newTask.id = created.id;
+      newTask.parent = created.parent || parentId || "";
       updateSyncIndicator("google");
     } catch (e) {
       showToast("Saved locally; Google Tasks sync error: " + e.message);
@@ -609,9 +623,13 @@ async function updateTaskDetails(taskId, updates) {
   const task = tasks.find((t) => t.id === taskId);
   if (!task) return;
 
+  const oldParent = task.parent || "";
+  const newParent = updates.parent !== undefined ? updates.parent : oldParent;
+
   task.title = updates.title.trim();
   task.due = updates.due || "";
   task.notes = (updates.notes || "").trim();
+  task.parent = newParent;
   task.updated = new Date().toISOString();
   renderTasks();
 
@@ -629,6 +647,18 @@ async function updateTaskDetails(taskId, updates) {
           })
         }
       );
+
+      // If parent group changed, call Google Tasks move endpoint
+      if (oldParent !== newParent) {
+        const moveQuery = newParent
+          ? `?parent=${encodeURIComponent(newParent)}`
+          : "";
+        await googleApiFetch(
+          `/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}/move${moveQuery}`,
+          { method: "POST" }
+        );
+      }
+
       updateSyncIndicator("google");
     } catch (e) {
       showToast("Sync error: " + e.message);
@@ -641,7 +671,10 @@ async function updateTaskDetails(taskId, updates) {
 async function deleteTask(taskId) {
   const listId = state.activeListId;
   const tasks = state.tasksByList[listId] || [];
-  state.tasksByList[listId] = tasks.filter((t) => t.id !== taskId);
+  // Also delete any subtasks belonging to this group
+  const childIds = tasks.filter((t) => t.parent === taskId).map((t) => t.id);
+  const idsToRemove = new Set([taskId, ...childIds]);
+  state.tasksByList[listId] = tasks.filter((t) => !idsToRemove.has(t.id));
   renderTasks();
 
   if (state.mode === "google" && state.authToken) {
@@ -754,67 +787,215 @@ function renderTasks() {
   const activeCount = allTasks.filter((t) => t.status !== "completed").length;
   els.taskCounter.textContent = `${activeCount} remaining`;
 
-  const filtered = allTasks.filter((t) => {
+  // Populate parent group dropdowns with top-level tasks
+  const topLevelTasks = allTasks.filter((t) => !t.parent);
+  populateParentSelect(els.taskParentSelect, topLevelTasks, els.taskParentSelect ? els.taskParentSelect.value : "");
+
+  // Sort helper: incomplete first, then due date
+  const sortTasks = (arr) =>
+    [...arr].sort((a, b) => {
+      if (a.status !== b.status) return a.status === "completed" ? 1 : -1;
+      if (a.due && b.due && a.due !== b.due) return a.due.localeCompare(b.due);
+      if (a.due && !b.due) return -1;
+      if (!a.due && b.due) return 1;
+      return 0;
+    });
+
+  const matchesFilter = (t) => {
     if (state.filter === "active") return t.status !== "completed";
     if (state.filter === "completed") return t.status === "completed";
     return true;
+  };
+
+  // Group subtasks by parent ID
+  const subtasksByParent = {};
+  const taskMap = new Map(allTasks.map((t) => [t.id, t]));
+  const roots = [];
+
+  allTasks.forEach((t) => {
+    if (t.parent && taskMap.has(t.parent)) {
+      if (!subtasksByParent[t.parent]) subtasksByParent[t.parent] = [];
+      subtasksByParent[t.parent].push(t);
+    } else {
+      roots.push(t);
+    }
   });
 
-  // Sort: incomplete first, then by due date, then recently updated
-  filtered.sort((a, b) => {
-    if (a.status !== b.status) {
-      return a.status === "completed" ? 1 : -1;
-    }
-    if (a.due && b.due && a.due !== b.due) {
-      return a.due.localeCompare(b.due);
-    }
-    if (a.due && !b.due) return -1;
-    if (!a.due && b.due) return 1;
-    return 0;
-  });
-
+  const sortedRoots = sortTasks(roots);
   els.tasksContainer.innerHTML = "";
+  let renderedCount = 0;
 
-  if (filtered.length === 0) {
+  sortedRoots.forEach((rootTask) => {
+    const allChildren = sortTasks(subtasksByParent[rootTask.id] || []);
+    const visibleChildren = allChildren.filter(matchesFilter);
+    const rootMatches = matchesFilter(rootTask);
+
+    // Show root if it matches filter OR if any of its subtasks match the filter
+    if (!rootMatches && visibleChildren.length === 0) {
+      return;
+    }
+
+    renderedCount++;
+    const hasSubtasks = allChildren.length > 0;
+    const isCollapsed = Boolean(state.collapsedGroups[rootTask.id]);
+
+    const groupWrapper = document.createElement("div");
+    groupWrapper.className = "task-group-wrapper";
+
+    const rootEl = createTaskRowElement(rootTask, {
+      isSubtask: false,
+      hasSubtasks,
+      allChildren,
+      isCollapsed
+    });
+    groupWrapper.appendChild(rootEl);
+
+    // Inline "+ Subtask" quick form when active for this group
+    if (state.inlineSubtaskParentId === rootTask.id) {
+      const subForm = document.createElement("form");
+      subForm.className = "inline-subtask-form";
+
+      const subInput = document.createElement("input");
+      subInput.type = "text";
+      subInput.placeholder = `Add subtask inside "${rootTask.title}"... (Enter)`;
+      subInput.required = true;
+
+      const subDue = document.createElement("input");
+      subDue.type = "date";
+      subDue.title = "Optional subtask due date";
+
+      const saveSubBtn = document.createElement("button");
+      saveSubBtn.type = "submit";
+      saveSubBtn.className = "btn-primary-xs";
+      saveSubBtn.textContent = "Add";
+
+      const cancelSubBtn = document.createElement("button");
+      cancelSubBtn.type = "button";
+      cancelSubBtn.className = "btn-ghost-xs";
+      cancelSubBtn.textContent = "Cancel";
+      cancelSubBtn.addEventListener("click", () => {
+        state.inlineSubtaskParentId = null;
+        renderTasks();
+      });
+
+      subForm.appendChild(subInput);
+      subForm.appendChild(subDue);
+      subForm.appendChild(saveSubBtn);
+      subForm.appendChild(cancelSubBtn);
+
+      subForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const subTitle = subInput.value;
+        const subDueDate = subDue.value;
+        state.inlineSubtaskParentId = null;
+        await addTask(subTitle, subDueDate, "", rootTask.id);
+      });
+
+      groupWrapper.appendChild(subForm);
+      setTimeout(() => subInput.focus(), 0);
+    }
+
+    // Render subtasks container if expanded
+    if (visibleChildren.length > 0 && !isCollapsed) {
+      const subContainer = document.createElement("div");
+      subContainer.className = "subtasks-container";
+
+      visibleChildren.forEach((childTask) => {
+        const childEl = createTaskRowElement(childTask, {
+          isSubtask: true,
+          hasSubtasks: false,
+          allChildren: [],
+          isCollapsed: false
+        });
+        subContainer.appendChild(childEl);
+      });
+
+      groupWrapper.appendChild(subContainer);
+    }
+
+    els.tasksContainer.appendChild(groupWrapper);
+  });
+
+  if (renderedCount === 0) {
     els.emptyState.classList.remove("hidden");
   } else {
     els.emptyState.classList.add("hidden");
   }
+}
 
-  filtered.forEach((task) => {
-    const item = document.createElement("div");
-    item.className = `task-item ${
-      task.status === "completed" ? "completed" : ""
-    }`;
+function createTaskRowElement(
+  task,
+  { isSubtask, hasSubtasks, allChildren, isCollapsed }
+) {
+  const item = document.createElement("div");
+  item.className = [
+    "task-item",
+    task.status === "completed" ? "completed" : "",
+    isSubtask ? "is-subtask" : "",
+    hasSubtasks ? "is-group-parent" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-    const left = document.createElement("div");
-    left.className = "task-left";
+  const left = document.createElement("div");
+  left.className = "task-left";
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "task-checkbox";
-    checkbox.checked = task.status === "completed";
-    checkbox.addEventListener("change", () => toggleTaskStatus(task.id));
+  // Collapse/expand chevron for task groups
+  if (!isSubtask && hasSubtasks) {
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = `group-toggle-btn ${isCollapsed ? "collapsed" : ""}`;
+    toggleBtn.title = isCollapsed ? "Expand subtasks" : "Collapse subtasks";
+    toggleBtn.textContent = "▼";
+    toggleBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (state.collapsedGroups[task.id]) {
+        delete state.collapsedGroups[task.id];
+      } else {
+        state.collapsedGroups[task.id] = true;
+      }
+      renderTasks();
+    });
+    left.appendChild(toggleBtn);
+  }
 
-    const content = document.createElement("div");
-    content.className = "task-content";
-    content.addEventListener("click", () => openEditModal(task));
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "task-checkbox";
+  checkbox.checked = task.status === "completed";
+  checkbox.addEventListener("change", () => toggleTaskStatus(task.id));
 
-    const titleEl = document.createElement("div");
-    titleEl.className = "task-title";
-    titleEl.textContent = task.title;
-    content.appendChild(titleEl);
+  const content = document.createElement("div");
+  content.className = "task-content";
+  content.addEventListener("click", () => openEditModal(task));
 
-    if (task.notes) {
-      const notesEl = document.createElement("div");
-      notesEl.className = "task-notes";
-      notesEl.textContent = task.notes;
-      content.appendChild(notesEl);
+  const titleEl = document.createElement("div");
+  titleEl.className = "task-title";
+  titleEl.textContent = task.title;
+  content.appendChild(titleEl);
+
+  if (task.notes) {
+    const notesEl = document.createElement("div");
+    notesEl.className = "task-notes";
+    notesEl.textContent = task.notes;
+    content.appendChild(notesEl);
+  }
+
+  if (task.due || hasSubtasks) {
+    const meta = document.createElement("div");
+    meta.className = "task-meta";
+
+    if (hasSubtasks) {
+      const doneSubCount = allChildren.filter(
+        (c) => c.status === "completed"
+      ).length;
+      const groupPill = document.createElement("span");
+      groupPill.className = "subtask-count-pill";
+      groupPill.textContent = `${doneSubCount}/${allChildren.length} subtasks`;
+      meta.appendChild(groupPill);
     }
 
     if (task.due) {
-      const meta = document.createElement("div");
-      meta.className = "task-meta";
       const duePill = document.createElement("span");
       const isOverdue =
         task.status !== "completed" &&
@@ -822,33 +1003,74 @@ function renderTasks() {
       duePill.className = `due-pill ${isOverdue ? "overdue" : ""}`;
       duePill.textContent = `Due ${formatDateNice(task.due)}`;
       meta.appendChild(duePill);
-      content.appendChild(meta);
     }
 
-    left.appendChild(checkbox);
-    left.appendChild(content);
+    content.appendChild(meta);
+  }
 
-    const actions = document.createElement("div");
-    actions.className = "task-actions";
+  left.appendChild(checkbox);
+  left.appendChild(content);
 
-    const editBtn = document.createElement("button");
-    editBtn.className = "icon-btn-sm";
-    editBtn.title = "Edit task";
-    editBtn.innerHTML = "✎";
-    editBtn.addEventListener("click", () => openEditModal(task));
+  const actions = document.createElement("div");
+  actions.className = "task-actions";
 
-    const delBtn = document.createElement("button");
-    delBtn.className = "icon-btn-sm";
-    delBtn.title = "Delete task";
-    delBtn.innerHTML = "&times;";
-    delBtn.addEventListener("click", () => deleteTask(task.id));
+  // Allow any top-level task to act as a Task Group with a "+ Subtask" button
+  if (!isSubtask) {
+    const addSubBtn = document.createElement("button");
+    addSubBtn.type = "button";
+    addSubBtn.className = "icon-btn-sm btn-add-subtask-icon";
+    addSubBtn.title = "Add subtask to this group";
+    addSubBtn.textContent = "+ Subtask";
+    addSubBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.inlineSubtaskParentId =
+        state.inlineSubtaskParentId === task.id ? null : task.id;
+      delete state.collapsedGroups[task.id];
+      renderTasks();
+    });
+    actions.appendChild(addSubBtn);
+  }
 
-    actions.appendChild(editBtn);
-    actions.appendChild(delBtn);
+  const editBtn = document.createElement("button");
+  editBtn.className = "icon-btn-sm";
+  editBtn.title = "Edit task";
+  editBtn.innerHTML = "✎";
+  editBtn.addEventListener("click", () => openEditModal(task));
 
-    item.appendChild(left);
-    item.appendChild(actions);
-    els.tasksContainer.appendChild(item);
+  const delBtn = document.createElement("button");
+  delBtn.className = "icon-btn-sm";
+  delBtn.title = "Delete task";
+  delBtn.innerHTML = "&times;";
+  delBtn.addEventListener("click", () => deleteTask(task.id));
+
+  actions.appendChild(editBtn);
+  actions.appendChild(delBtn);
+
+  item.appendChild(left);
+  item.appendChild(actions);
+  return item;
+}
+
+function populateParentSelect(selectEl, topLevelTasks, selectedId = "", excludeTaskId = "") {
+  if (!selectEl) return;
+  const defaultLabel =
+    selectEl === els.editTaskParent
+      ? "None (Top-Level Task / Group)"
+      : "Top-Level Task / Group";
+
+  selectEl.innerHTML = "";
+  const rootOpt = document.createElement("option");
+  rootOpt.value = "";
+  rootOpt.textContent = defaultLabel;
+  selectEl.appendChild(rootOpt);
+
+  topLevelTasks.forEach((t) => {
+    if (t.id === excludeTaskId) return;
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = `Group: ${t.title}`;
+    if (t.id === selectedId) opt.selected = true;
+    selectEl.appendChild(opt);
   });
 }
 
@@ -893,6 +1115,15 @@ function updateConnectionModalUI(connected) {
 }
 
 function openEditModal(task) {
+  const allTasks = state.tasksByList[state.activeListId] || [];
+  const topLevelTasks = allTasks.filter((t) => !t.parent);
+  populateParentSelect(
+    els.editTaskParent,
+    topLevelTasks,
+    task.parent || "",
+    task.id
+  );
+
   els.editTaskId.value = task.id;
   els.editTaskTitle.value = task.title;
   els.editTaskDue.value = task.due || "";
@@ -958,11 +1189,12 @@ function setupEventListeners() {
     const title = els.taskTitleInput.value;
     const due = els.taskDueInput.value;
     const notes = els.taskNotesInput.value;
+    const parentId = els.taskParentSelect ? els.taskParentSelect.value : "";
     els.taskTitleInput.value = "";
     els.taskDueInput.value = "";
     els.taskNotesInput.value = "";
     els.composerNotesWrap.classList.add("hidden");
-    await addTask(title, due, notes);
+    await addTask(title, due, notes, parentId);
   });
 
   els.toggleNotesBtn.addEventListener("click", () => {
@@ -1015,6 +1247,7 @@ function setupEventListeners() {
     const id = els.editTaskId.value;
     await updateTaskDetails(id, {
       title: els.editTaskTitle.value,
+      parent: els.editTaskParent ? els.editTaskParent.value : "",
       due: els.editTaskDue.value,
       notes: els.editTaskNotes.value
     });
