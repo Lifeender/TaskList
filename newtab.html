@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Tab — TaskList</title>
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="stylesheet" href="newtab.css" />
+</head>
+<body>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <div class="app-shell">
+    <!-- Top Bar: Search + Sync Status + Settings -->
+    <header class="top-bar">
+      <form id="google-search-form" class="search-bar" action="https://www.google.com/search" method="GET">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input
+          type="text"
+          name="q"
+          id="search-input"
+          placeholder="Search Google or type a URL..."
+          autocomplete="off"
+        />
+        <kbd class="search-shortcut" title="Press / to focus search">/</kbd>
+      </form>
+
+      <div class="top-actions">
+        <div id="sync-badge" class="sync-badge status-local" title="Click to sync or configure Google Tasks">
+          <span class="sync-dot"></span>
+          <span id="sync-status-text">Chrome Sync</span>
+        </div>
+
+        <button id="refresh-btn" class="icon-btn" title="Sync now">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+
+        <button id="gemini-tip-btn" class="gemini-pill-btn" title="How to edit tasks with Google Gemini">
+          <svg class="sparkle-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L14.6 9.4L22 12L14.6 14.6L12 22L9.4 14.6L2 12L9.4 9.4L12 2Z" />
+          </svg>
+          <span>Ask Gemini</span>
+        </button>
+
+        <button id="settings-btn" class="icon-btn" title="Settings & Google Tasks Connection">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Layout: Sidebar Lists + Tasks Board -->
+    <main class="workspace">
+      <!-- Sidebar: Task Lists -->
+      <aside class="lists-sidebar">
+        <div class="sidebar-header">
+          <h2>Task Lists</h2>
+          <button id="new-list-btn" class="icon-btn-sm" title="Create new task list">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+
+        <ul id="task-lists-nav" class="lists-nav">
+          <!-- Populated dynamically -->
+        </ul>
+
+        <!-- New List Inline Form (Hidden by default) -->
+        <form id="new-list-form" class="new-list-form hidden">
+          <input
+            type="text"
+            id="new-list-input"
+            placeholder="List name (e.g. TaskList)"
+            maxlength="60"
+            required
+          />
+          <div class="new-list-actions">
+            <button type="submit" class="btn-primary-xs">Add</button>
+            <button type="button" id="cancel-list-btn" class="btn-ghost-xs">Cancel</button>
+          </div>
+        </form>
+
+        <div class="sidebar-footer">
+          <div class="gemini-card">
+            <div class="gemini-card-header">
+              <svg class="sparkle-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L14.6 9.4L22 12L14.6 14.6L12 22L9.4 14.6L2 12L9.4 9.4L12 2Z" />
+              </svg>
+              <span>Gemini Voice &amp; Chat</span>
+            </div>
+            <p class="gemini-card-desc">
+              Say to Gemini:<br />
+              <code>"Add 'Buy flight tickets' to my <span id="active-list-prompt-name">TaskList</span> list in Google Tasks"</code>
+            </p>
+            <a href="https://gemini.google.com" target="_blank" rel="noopener" class="gemini-open-link">
+              Open Google Gemini &rarr;
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Task Area -->
+      <section class="tasks-panel">
+        <div class="tasks-header">
+          <div class="tasks-title-group">
+            <h1 id="current-list-title">TaskList</h1>
+            <span id="task-counter" class="task-counter">0 remaining</span>
+          </div>
+
+          <div class="tasks-filter-group">
+            <button class="filter-tab active" data-filter="all">All</button>
+            <button class="filter-tab" data-filter="active">Active</button>
+            <button class="filter-tab" data-filter="completed">Completed</button>
+            <button id="clear-completed-btn" class="btn-ghost-sm" title="Remove completed tasks">
+              Clear Done
+            </button>
+          </div>
+        </div>
+
+        <!-- Add Task Composer -->
+        <form id="add-task-form" class="task-composer">
+          <div class="composer-main">
+            <span class="composer-plus">+</span>
+            <input
+              type="text"
+              id="task-title-input"
+              placeholder="Add a new task... (Press Enter to save)"
+              autocomplete="off"
+              required
+            />
+            <input
+              type="date"
+              id="task-due-input"
+              class="due-date-picker"
+              title="Optional due date"
+            />
+            <button type="button" id="toggle-notes-btn" class="icon-btn-sm" title="Add notes / details">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="17" y1="10" x2="3" y2="10"></line>
+                <line x1="21" y1="6" x2="3" y2="6"></line>
+                <line x1="21" y1="14" x2="3" y2="14"></line>
+                <line x1="17" y1="18" x2="3" y2="18"></line>
+              </svg>
+            </button>
+            <button type="submit" class="btn-add-task">Add Task</button>
+          </div>
+
+          <div id="composer-notes-wrap" class="composer-notes-wrap hidden">
+            <textarea
+              id="task-notes-input"
+              rows="2"
+              placeholder="Add notes, links, or details..."
+            ></textarea>
+          </div>
+        </form>
+
+        <!-- Tasks Container -->
+        <div id="tasks-container" class="tasks-list">
+          <!-- Populated dynamically -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="empty-state hidden">
+          <div class="empty-icon">✓</div>
+          <h3>All caught up!</h3>
+          <p>Add a task above or ask Google Gemini to add items to your <strong id="empty-list-name">TaskList</strong>.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Task Edit Modal -->
+  <div id="edit-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Edit Task</h3>
+        <button id="close-edit-modal" class="icon-btn-sm">&times;</button>
+      </div>
+      <form id="edit-task-form" class="modal-body">
+        <input type="hidden" id="edit-task-id" />
+        <label class="field-label">
+          <span>Task Title</span>
+          <input type="text" id="edit-task-title" required />
+        </label>
+        <label class="field-label">
+          <span>Due Date</span>
+          <input type="date" id="edit-task-due" />
+        </label>
+        <label class="field-label">
+          <span>Notes &amp; Details</span>
+          <textarea id="edit-task-notes" rows="4" placeholder="Add details..."></textarea>
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="delete-task-modal-btn" class="btn-danger">Delete Task</button>
+          <div class="modal-right-btns">
+            <button type="button" id="cancel-edit-btn" class="btn-ghost">Cancel</button>
+            <button type="submit" class="btn-primary">Save Changes</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Settings & Google Tasks / Gemini Setup Modal -->
+  <div id="settings-modal" class="modal-backdrop hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3>Sync Settings &amp; Google Gemini Integration</h3>
+        <button id="close-settings-modal" class="icon-btn-sm">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-section">
+          <div class="connection-banner" id="connection-banner">
+            <div>
+              <h4 id="connection-title">Currently using Chrome Account Sync</h4>
+              <p id="connection-desc">
+                Your tasks automatically sync across your PC and MacBook via Chrome Sync. Connect Google Tasks below so Google Gemini can directly add/edit tasks on your list!
+              </p>
+            </div>
+            <div class="connection-buttons">
+              <button id="connect-google-btn" class="btn-primary">Sign in with Google</button>
+              <button id="disconnect-google-btn" class="btn-ghost hidden">Disconnect</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h4>Google Cloud OAuth Client ID</h4>
+          <p class="settings-hint">
+            To connect Google Tasks, enter your Google OAuth 2.0 Client ID below (this is synced via Chrome Sync so you only have to paste it once for both PC &amp; Mac):
+          </p>
+          <div class="input-with-btn">
+            <input
+              type="text"
+              id="oauth-client-id-input"
+              placeholder="1234567890-abcdefg.apps.googleusercontent.com"
+            />
+            <button id="save-client-id-btn" class="btn-primary">Save ID</button>
+          </div>
+
+          <div class="extension-info-box">
+            <div>
+              <strong>Your Extension ID:</strong>
+              <code id="ext-id-display">Loading...</code>
+            </div>
+            <div>
+              <strong>Redirect URI (for Web Auth fallback):</strong>
+              <code id="redirect-uri-display">Loading...</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h4>Quick 3-Step Setup for Google Tasks + Gemini</h4>
+          <ol class="setup-steps">
+            <li>
+              Go to the <a href="https://console.cloud.google.com/apis/library/tasks.googleapis.com" target="_blank" rel="noopener">Google Cloud Console — Tasks API</a> and click <strong>Enable</strong>.
+            </li>
+            <li>
+              Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Credentials</a> &rarr; <strong>Create Credentials</strong> &rarr; <strong>OAuth client ID</strong>.
+              <ul>
+                <li>Choose <strong>Chrome Extension</strong> (and enter the Extension ID shown above) <em>OR</em> choose <strong>Web application</strong> and add the <strong>Redirect URI</strong> shown above under <em>Authorized redirect URIs</em>. (Using <em>Web application</em> is easiest across PC &amp; Mac if your unpacked Extension ID differs!)</li>
+              </ul>
+            </li>
+            <li>
+              Paste the Client ID above, click <strong>Save ID</strong>, and click <strong>Sign in with Google</strong>.
+            </li>
+            <li>
+              In <a href="https://gemini.google.com/extensions" target="_blank" rel="noopener">Google Gemini Extensions</a>, make sure <strong>Google Workspace</strong> is enabled. Then just ask Gemini: <em>"Add 'Call dentist' to my TaskList list in Google Tasks"</em>!
+            </li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="newtab.js"></script>
+</body>
+</html>

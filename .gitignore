@@ -1,0 +1,15 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Packaged extension artifacts
+*.pem
+*.crx
+*.zip

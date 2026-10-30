@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "TaskList — New Tab & Gemini Sync",
+  "version": "1.0.0",
+  "description": "A clean New Tab task manager synced across PC & Mac via Chrome Sync and Google Tasks (editable via Google Gemini).",
+  "permissions": [
+    "storage",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://tasks.googleapis.com/*"
+  ],
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "action": {
+    "default_title": "Open TaskList"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/tasks"
+    ]
+  }
+}
