@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  TaskList Extension — GitHub Auto-Updater for Windows PC
+  TaskList Extension - GitHub Auto-Updater for Windows PC
 .DESCRIPTION
   1. Pulls the latest changes from GitHub (`git pull --ff-only`).
   2. Optionally registers a silent Windows Scheduled Task that checks GitHub every 15 minutes

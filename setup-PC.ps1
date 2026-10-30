@@ -1,12 +1,12 @@
 # ==============================================================================
-# TaskList Extension — One-Step Windows PC Setup & Auto-Updater Installer
+# TaskList Extension - One-Step Windows PC Setup & Auto-Updater Installer
 # ==============================================================================
 $ErrorActionPreference = "Stop"
 $RepoDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $RepoDir
 
 Write-Host "========================================================" -ForegroundColor Cyan
-Write-Host "  TaskList Chrome Extension — Windows PC Setup" -ForegroundColor Cyan
+Write-Host "  TaskList Chrome Extension - Windows PC Setup" -ForegroundColor Cyan
 Write-Host "========================================================" -ForegroundColor Cyan
 
 # Install the Windows Scheduled Task so the PC auto-pulls updates from GitHub every 15m
@@ -22,4 +22,4 @@ Write-Host "      $RepoDir" -ForegroundColor White
 Write-Host "========================================================" -ForegroundColor Cyan
 
 # Open Chrome convenience
-Start-Process "chrome.exe" "http://extensions" -ErrorAction SilentlyContinue
+Start-Process "chrome.exe" -ArgumentList "chrome://extensions" -ErrorAction SilentlyContinue
