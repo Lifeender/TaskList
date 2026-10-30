@@ -13,14 +13,27 @@ A clean, dark-mode Chrome New Tab extension that keeps your task lists synced ac
 
 ## How to Install on PC & MacBook (Chrome)
 
-1. Copy the `TaskListFiles` folder to your PC and your MacBook (since it's in your `OneDrive\Desktop\TaskListFiles`, OneDrive can even sync the folder automatically!).
-2. Open Google Chrome and navigate to:
+### One-Line Setup for MacBook (Terminal)
+Open **Terminal** on your MacBook and paste this single command to clone the repository to your Desktop and activate the automatic background GitHub updater:
+```bash
+git clone https://github.com/Lifeender/TaskList.git ~/Desktop/TaskList && ~/Desktop/TaskList/setup-Mac.command
+```
+
+### One-Line Setup for Windows PC (PowerShell)
+Open **PowerShell** on your Windows PC and paste this single command to clone the repository to your Desktop (or update it if already present) and activate the automatic background GitHub updater:
+```powershell
+git clone https://github.com/Lifeender/TaskList.git "$HOME\Desktop\TaskList"; powershell -ExecutionPolicy Bypass -File "$HOME\Desktop\TaskList\setup-PC.ps1"
+```
+
+### Final Step in Chrome (Both PC & Mac)
+1. Open Google Chrome and navigate to:
    ```
    chrome://extensions
    ```
-3. Toggle **Developer mode** ON (top-right corner).
-4. Click **Load unpacked** (top-left corner) and select the `TaskListFiles` folder.
-5. Open a **New Tab** (`Ctrl+T` on PC / `Cmd+T` on Mac) and click **Keep it** if Chrome asks whether to keep the new tab page change.
+2. Toggle **Developer mode** ON (top-right corner).
+3. Click **Load unpacked** (top-left corner) and select the `TaskList` folder on your Desktop.
+4. Open a **New Tab** (`Ctrl+T` on PC / `Cmd+T` on Mac) and click **Keep it** if Chrome asks whether to keep the new tab page change.
+   *(Because `manifest.json` includes a fixed deterministic public key, both your PC and MacBook receive the exact same Extension ID so Chrome Sync and Google OAuth work seamlessly across both devices!)*
 
 ---
 
