@@ -62,6 +62,12 @@ const els = {
   saveClientIdBtn: document.getElementById("save-client-id-btn"),
   extIdDisplay: document.getElementById("ext-id-display"),
   redirectUriDisplay: document.getElementById("redirect-uri-display"),
+  updateBannerBtn: document.getElementById("update-banner-btn"),
+  githubRepoInput: document.getElementById("github-repo-input"),
+  checkUpdateBtn: document.getElementById("check-update-btn"),
+  pullReloadBtn: document.getElementById("pull-reload-btn"),
+  localVersionDisplay: document.getElementById("local-version-display"),
+  remoteVersionDisplay: document.getElementById("remote-version-display"),
   toast: document.getElementById("toast")
 };
 
@@ -84,6 +90,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 function populateExtensionDiagnostics() {
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
     els.extIdDisplay.textContent = chrome.runtime.id;
+    const manifest = chrome.runtime.getManifest();
+    if (manifest && manifest.version && els.localVersionDisplay) {
+      els.localVersionDisplay.textContent = manifest.version;
+    }
   } else {
     els.extIdDisplay.textContent = "Load as Unpacked Extension in chrome://extensions";
   }
@@ -92,6 +102,41 @@ function populateExtensionDiagnostics() {
     els.redirectUriDisplay.textContent = chrome.identity.getRedirectURL();
   } else {
     els.redirectUriDisplay.textContent = "https://<extension-id>.chromiumapp.org/";
+  }
+
+  initGitHubUpdateStatus();
+}
+
+async function initGitHubUpdateStatus() {
+  if (typeof chrome === "undefined" || !chrome.storage) return;
+
+  const syncCfg = await chrome.storage.sync.get(["githubRepo"]);
+  if (syncCfg.githubRepo && els.githubRepoInput) {
+    els.githubRepoInput.value = syncCfg.githubRepo;
+  }
+
+  const localStore = await chrome.storage.local.get(["githubUpdateStatus"]);
+  if (localStore.githubUpdateStatus) {
+    renderGitHubUpdateStatus(localStore.githubUpdateStatus);
+  }
+}
+
+function renderGitHubUpdateStatus(status) {
+  if (!status || !els.remoteVersionDisplay) return;
+  if (!status.success) {
+    els.remoteVersionDisplay.textContent = status.error || "Unable to check GitHub";
+    return;
+  }
+
+  const shaPart = status.latestCommitSha ? ` (commit ${status.latestCommitSha})` : "";
+  if (status.updateAvailable) {
+    els.remoteVersionDisplay.textContent = `Update available: v${status.remoteVersion}${shaPart}`;
+    els.remoteVersionDisplay.style.color = "#4ade80";
+    if (els.updateBannerBtn) els.updateBannerBtn.classList.remove("hidden");
+  } else {
+    els.remoteVersionDisplay.textContent = `Up to date: v${status.remoteVersion}${shaPart}`;
+    els.remoteVersionDisplay.style.color = "#93c5fd";
+    if (els.updateBannerBtn) els.updateBannerBtn.classList.add("hidden");
   }
 }
 
@@ -1015,4 +1060,69 @@ function setupEventListeners() {
       await trySilentGoogleConnect();
     }
   });
+
+  // GitHub Auto-Updater UI controls
+  if (els.updateBannerBtn) {
+    els.updateBannerBtn.addEventListener("click", openSettings);
+  }
+
+  if (els.checkUpdateBtn) {
+    els.checkUpdateBtn.addEventListener("click", async () => {
+      const repo = els.githubRepoInput.value.trim() || "Lifeender/TaskList";
+      if (typeof chrome !== "undefined" && chrome.storage) {
+        await chrome.storage.sync.set({ githubRepo: repo });
+      }
+      els.remoteVersionDisplay.textContent = "Checking GitHub...";
+      chrome.runtime.sendMessage(
+        { type: "CHECK_GITHUB_UPDATE", githubRepo: repo, githubBranch: "main" },
+        (response) => {
+          renderGitHubUpdateStatus(response);
+          if (response && response.success) {
+            showToast(
+              response.updateAvailable
+                ? `New update found on GitHub (${response.latestCommitSha || response.remoteVersion})!`
+                : "Extension is up to date with GitHub!"
+            );
+          } else {
+            showToast((response && response.error) || "Could not check GitHub.");
+          }
+        }
+      );
+    });
+  }
+
+  if (els.pullReloadBtn) {
+    els.pullReloadBtn.addEventListener("click", () => {
+      showToast("Triggering local git pull...");
+      chrome.runtime.sendMessage({ type: "TRIGGER_LOCAL_GIT_PULL" }, (res) => {
+        if (res && res.success) {
+          if (res.reloaded) {
+            showToast("Updated from GitHub! Reloading extension...");
+          } else {
+            // Even if files were already pulled by background script, mark current SHA & reload runtime
+            chrome.storage.local.get(["githubUpdateStatus"], (st) => {
+              if (st.githubUpdateStatus && st.githubUpdateStatus.latestCommitSha) {
+                chrome.storage.local.set({
+                  lastKnownCommitSha: st.githubUpdateStatus.latestCommitSha
+                });
+              }
+              showToast(res.output || "Reloading extension...");
+              setTimeout(() => chrome.runtime.reload(), 600);
+            });
+          }
+        } else {
+          // If local HTTP daemon isn't running, still reload extension in case git pull was done via scheduled task / terminal
+          chrome.storage.local.get(["githubUpdateStatus"], (st) => {
+            if (st.githubUpdateStatus && st.githubUpdateStatus.latestCommitSha) {
+              chrome.storage.local.set({
+                lastKnownCommitSha: st.githubUpdateStatus.latestCommitSha
+              });
+            }
+            showToast("Reloading extension with latest local files...");
+            setTimeout(() => chrome.runtime.reload(), 800);
+          });
+        }
+      });
+    });
+  }
 }

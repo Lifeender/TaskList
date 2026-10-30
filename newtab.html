@@ -30,6 +30,10 @@
       </form>
 
       <div class="top-actions">
+        <button id="update-banner-btn" class="update-pill-btn hidden" title="A newer version is on GitHub! Click to update">
+          <span>⬆ Update Available</span>
+        </button>
+
         <div id="sync-badge" class="sync-badge status-local" title="Click to sync or configure Google Tasks">
           <span class="sync-dot"></span>
           <span id="sync-status-text">Chrome Sync</span>
@@ -281,6 +285,34 @@
               In <a href="https://gemini.google.com/extensions" target="_blank" rel="noopener">Google Gemini Extensions</a>, make sure <strong>Google Workspace</strong> is enabled. Then just ask Gemini: <em>"Add 'Call dentist' to my TaskList list in Google Tasks"</em>!
             </li>
           </ol>
+        </div>
+
+        <div class="settings-section">
+          <h4>GitHub Auto-Updater (PC &amp; MacBook)</h4>
+          <p class="settings-hint">
+            Automatically checks your GitHub repository for new commits/versions and pulls updates across your PC and MacBook.
+          </p>
+          <div class="input-with-btn">
+            <input
+              type="text"
+              id="github-repo-input"
+              placeholder="Lifeender/TaskList"
+              value="Lifeender/TaskList"
+            />
+            <button id="check-update-btn" class="btn-primary">Check for Updates</button>
+            <button id="pull-reload-btn" class="btn-ghost">Pull &amp; Reload Now</button>
+          </div>
+          <div class="extension-info-box" id="github-update-info">
+            <div>
+              <strong>Installed Version:</strong> <code id="local-version-display">1.0.0</code>
+              &nbsp;|&nbsp;
+              <strong>GitHub Status:</strong> <span id="remote-version-display">Not checked yet</span>
+            </div>
+            <div>
+              <strong>Background Auto-Pull Scripts:</strong>
+              Run <code>.\auto-update-PC.ps1</code> (on Windows) or <code>./auto-update-Mac.sh</code> (on MacBook) once to install the silent background updater that automatically runs <code>git pull</code> whenever you push to GitHub!
+            </div>
+          </div>
         </div>
       </div>
     </div>

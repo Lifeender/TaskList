@@ -196,6 +196,25 @@ body {
   transform: translateY(-1px);
 }
 
+.update-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(46, 160, 67, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(46, 160, 67, 0.5);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.update-pill-btn:hover {
+  background: rgba(46, 160, 67, 0.32);
+}
+
 .sparkle-icon {
   width: 15px;
   height: 15px;

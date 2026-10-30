@@ -5,10 +5,13 @@
   "description": "A clean New Tab task manager synced across PC & Mac via Chrome Sync and Google Tasks (editable via Google Gemini).",
   "permissions": [
     "storage",
-    "identity"
+    "identity",
+    "alarms"
   ],
   "host_permissions": [
-    "https://tasks.googleapis.com/*"
+    "https://tasks.googleapis.com/*",
+    "https://api.github.com/*",
+    "https://raw.githubusercontent.com/*"
   ],
   "chrome_url_overrides": {
     "newtab": "newtab.html"

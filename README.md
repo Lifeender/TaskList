@@ -46,3 +46,40 @@ Once connected, you can talk to Gemini on the web, your phone, or the Mac/PC app
 - *"Add 'Finish project report due Friday' to my TaskList list in Google Tasks"*
 - *"Mark 'Buy groceries' as completed in Google Tasks"*
 - *"What's on my TaskList list in Google Tasks?"*
+
+---
+
+## GitHub Auto-Update Feature (PC & MacBook)
+
+This extension includes a built-in **GitHub Update Checker** plus cross-platform **Background Git Auto-Pull Scripts** so your extension stays updated whenever you push new commits to `Lifeender/TaskList`.
+
+### 1. In-Extension GitHub Checker & Reload
+- Every 30 minutes (or when you click **Check for Updates** in Settings), the extension checks your GitHub repo (`Lifeender/TaskList`) for new commits or a bumped `version` in `manifest.json`.
+- When a new commit is pushed, a green **⬆ Update Available** pill appears in the top bar of your New Tab page.
+- Clicking **Pull & Reload Now** in Settings reloads the extension runtime (`chrome.runtime.reload()`) with the latest files.
+
+### 2. Automatic Background `git pull` on Windows PC (`auto-update-PC.ps1`)
+In PowerShell inside the `TaskListFiles` folder:
+```powershell
+# Pull latest changes right now:
+.\auto-update-PC.ps1
+
+# Install a silent Windows Scheduled Task that runs `git pull` every 15 minutes:
+.\auto-update-PC.ps1 -InstallScheduledTask
+
+# Optional: Run the instant localhost listener so clicking "Pull & Reload Now" in Chrome runs `git pull` immediately:
+.\auto-update-PC.ps1 -Serve
+```
+
+### 3. Automatic Background `git pull` on MacBook (`auto-update-Mac.sh`)
+In Terminal inside your cloned `TaskList` folder on macOS:
+```bash
+chmod +x auto-update-Mac.sh
+
+# Pull latest changes right now:
+./auto-update-Mac.sh
+
+# Install a silent macOS LaunchAgent that runs `git pull` every 15 minutes in the background:
+./auto-update-Mac.sh --install
+```
+
